@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>FieldDiary — Concur Expense Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#c84b2f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FieldDiary">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --paper:#f5f2eb;
+    --ink:#12120f;
+    --orange:#c84b2f;
+    --gold:#b8860b;
+    --blue:#2f5fc8;
+    --green:#3f7d4a;
+    --line:#dcd6c6;
+    --card:#fffdf8;
+    --muted:#726d5e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'DM Sans',sans-serif;
+    position:relative;
+    min-height:100vh;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.05;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  h1,h2,h3,.brand,.tab,.stat-label,.section-title{font-family:'Syne',sans-serif;}
+  .mono{font-family:'DM Mono',monospace;}
+  .wrap{max-width:900px;margin:0 auto;padding:20px 16px 80px;position:relative;z-index:1;}
+
+  header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;}
+  .brand{font-size:28px;font-weight:800;color:var(--orange);letter-spacing:-.5px;}
+  .brand span{color:var(--ink);}
+  .sync-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .sync-pill{display:flex;align-items:center;gap:6px;font-size:12px;padding:6px 10px;border-radius:20px;background:var(--card);border:1px solid var(--line);}
+  .dot{width:8px;height:8px;border-radius:50%;background:#bbb;}
+  .dot.on{background:var(--green);}
+  .btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;padding:7px 12px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer;}
+  .btn.secondary{background:var(--card);color:var(--ink);border:1px solid var(--line);}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted);}
+  .btn:active{transform:translateY(1px);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  nav.tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:2px solid var(--line);overflow-x:auto;}
+  .tab{padding:9px 14px;font-size:14px;font-weight:700;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap;}
+  .tab.active{color:var(--orange);border-color:var(--orange);}
+
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px;}
+
+  /* Quick log */
+  .quicklog{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .quicklog .lead{font-weight:700;font-size:15px;}
+  .quicklog .sub{font-size:12px;color:var(--muted);}
+
+  /* Summary strip */
+  .stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+  .stat{flex:1;min-width:110px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+  .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);}
+  .stat-value{font-size:20px;font-weight:800;font-family:'DM Mono',monospace;}
+
+  .cal-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px;}
+  .cal-nav button{background:none;border:1px solid var(--line);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;}
+  .cal-nav .month-label{font-weight:700;font-size:16px;min-width:160px;text-align:center;}
+
+  .grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .dow{text-align:center;font-size:11px;font-weight:700;color:var(--muted);padding-bottom:4px;}
+  .day{position:relative;min-height:76px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px;cursor:pointer;}
+  .day.empty{background:transparent;border:none;cursor:default;}
+  .day.today{border:2px solid var(--orange);}
+  .day .num{font-size:11px;font-weight:700;color:var(--muted);}
+  .chips{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
+  .chip{font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;color:#fff;}
+  .chip.loc{background:var(--blue);}
+  .chip.hotel{background:var(--gold);}
+  .chip.receipt{background:var(--green);}
+  .chip.phone{background:var(--green);}
+  .chip.wfh{background:var(--muted);}
+
+  .day .tooltip{display:none;position:absolute;z-index:5;bottom:100%;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:var(--paper);font-size:11px;padding:8px 10px;border-radius:8px;width:210px;
+    line-height:1.5;box-shadow:0 6px 18px rgba(0,0,0,.25);}
+  .day:hover .tooltip{display:block;}
+  @media (max-width:600px){ .day .tooltip{display:none !important;} }
+
+  /* Location chip selector */
+  .loc-picker{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}
+  .loc-btn{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;}
+  .loc-btn.selected{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .loc-btn.add{border-style:dashed;color:var(--muted);}
+
+  .tag-picker{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}
+  .tag-btn{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;}
+  .tag-btn.selected{background:var(--orange);color:#fff;border-color:var(--orange);}
+
+  label.field-label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:10px 0 4px;}
+  input[type=text],input[type=date],input[type=number],input[type=file],textarea,select{
+    width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;background:#fff;
+  }
+  textarea{resize:vertical;min-height:60px;}
+
+  .geo-status{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px;}
+
+  /* modal */
+  .overlay{display:none;position:fixed;inset:0;background:rgba(18,18,15,.5);z-index:50;align-items:center;justify-content:center;padding:16px;}
+  .overlay.active{display:flex;}
+  .modal{background:var(--paper);border-radius:14px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;padding:20px;}
+  .modal h3{margin:0 0 4px;}
+  .modal-actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
+
+  /* receipts */
+  .receipt-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .receipt-row:last-child{border-bottom:none;}
+  .receipt-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;background:#eee;flex-shrink:0;}
+  .receipt-icon.photo-thumb{background-size:cover;background-position:center;cursor:pointer;}
+  .receipt-info{flex:1;min-width:0;}
+  .receipt-info .name{font-weight:700;font-size:14px;}
+  .receipt-info .meta{font-size:12px;color:var(--muted);}
+  .receipt-amt{font-family:'DM Mono',monospace;font-weight:700;font-size:14px;}
+  .status-badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;cursor:pointer;border:1px solid var(--line);}
+  .status-badge.ready{background:var(--green);color:#fff;border-color:var(--green);}
+  .status-badge.pending{background:#eee;color:var(--muted);}
+  .del-btn{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;}
+  #rPhotoPreview{max-width:120px;border-radius:8px;margin-top:8px;display:none;}
+
+  /* checklist */
+  .check-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;}
+  .check-item:last-child{border-bottom:none;}
+  .check-item .box{width:20px;height:20px;border:2px solid var(--ink);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;margin-top:1px;}
+  .check-item.done .box{background:var(--green);border-color:var(--green);color:#fff;}
+  .check-item.done .txt{text-decoration:line-through;color:var(--muted);}
+
+  .tip{background:#fbf3e6;border:1px solid #ecdcb8;border-radius:10px;padding:10px 12px;font-size:13px;color:#6b5a2e;margin-top:10px;}
+
+  .guide-step{display:flex;gap:12px;margin-bottom:14px;}
+  .guide-num{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:var(--orange);width:28px;flex-shrink:0;}
+
+  .empty-state{text-align:center;color:var(--muted);font-size:13px;padding:20px 0;}
+
+  footer.note{font-size:11px;color:var(--muted);text-align:center;margin-top:30px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">Field<span>Diary</span></div>
+    <div class="sync-row">
+      <div class="sync-pill"><span class="dot" id="syncDot"></span><span id="syncText">Checking storage…</span></div>
+      <button class="btn secondary" id="connectBtn" onclick="connectDrive()">Connect Google Drive</button>
+      <button class="btn ghost" onclick="exportData()">Export</button>
+      <button class="btn ghost" onclick="document.getElementById('importInput').click()">Import</button>
+      <input type="file" id="importInput" accept="application/json" style="display:none" onchange="importData(event)">
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <div class="tab active" data-tab="calendar" onclick="switchTab('calendar')">📅 Calendar Log</div>
+    <div class="tab" data-tab="receipts" onclick="switchTab('receipts')">🧾 Receipts</div>
+    <div class="tab" data-tab="checklist" onclick="switchTab('checklist')">✅ Month-End Checklist</div>
+    <div class="tab" data-tab="guide" onclick="switchTab('guide')">📖 System Guide</div>
+  </nav>
+
+  <!-- CALENDAR -->
+  <div class="panel active" id="panel-calendar">
+    <div class="card quicklog">
+      <div>
+        <div class="lead">Quick log</div>
+        <div class="sub">One tap for today, or pick a date if you forgot a day.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn" onclick="openEditorFor(todayKey())">＋ Log Today</button>
+        <input type="date" id="backdateInput" class="mono" style="width:150px;">
+        <button class="btn secondary" onclick="openEditorFor(document.getElementById('backdateInput').value)">Log This Date</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Location Days</div><div class="stat-value" id="statDays">0</div></div>
+      <div class="stat"><div class="stat-label">Hotel Nights</div><div class="stat-value" id="statHotel">0</div></div>
+      <div class="stat"><div class="stat-label">Receipts</div><div class="stat-value" id="statReceipts">0</div></div>
+      <div class="stat"><div class="stat-label">Phone Bill</div><div class="stat-value" id="statPhone">—</div></div>
+    </div>
+
+    <div class="cal-nav">
+      <button onclick="changeMonth(-1)">‹</button>
+      <div class="month-label" id="monthLabel"></div>
+      <button onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="grid7" id="dowRow"></div>
+    <div class="grid7" id="calGrid" style="margin-top:6px;"></div>
+  </div>
+
+  <!-- RECEIPTS -->
+  <div class="panel" id="panel-receipts">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;">Receipts — <span id="receiptsMonthLabel"></span></h3>
+        <button class="btn" onclick="toggleReceiptForm()">＋ Add</button>
+      </div>
+      <div id="receiptForm" style="display:none;margin-top:12px;">
+        <label class="field-label">Date</label>
+        <input type="date" id="rDate">
+        <label class="field-label">Type</label>
+        <select id="rType">
+          <option>Work Receipt</option>
+          <option>Hotel Stay</option>
+          <option>AT&T Phone Bill</option>
+          <option>Other</option>
+        </select>
+        <label class="field-label">Description</label>
+        <input type="text" id="rDesc" placeholder="e.g. Team dinner, parking, folio…">
+        <label class="field-label">Amount ($)</label>
+        <input type="number" id="rAmount" step="0.01" placeholder="0.00">
+        <label class="field-label">Photo</label>
+        <input type="file" id="rPhoto" accept="image/*" capture="environment" onchange="onReceiptPhotoChange()">
+        <img id="rPhotoPreview">
+        <div class="modal-actions">
+          <button class="btn" onclick="saveReceipt()">Save Receipt</button>
+          <button class="btn ghost" onclick="toggleReceiptForm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="receiptsList"></div>
+    <div class="tip">💡 AT&T phone bill reimbursement is capped at <strong>$100/month</strong> — log the full bill amount but confirm Concur only applies up to the cap.</div>
+  </div>
+
+  <!-- CHECKLIST -->
+  <div class="panel" id="panel-checklist">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;">Month-End Checklist — <span id="checklistMonthLabel"></span></h3>
+        <button class="btn ghost" onclick="resetChecklist()">Reset</button>
+      </div>
+      <div id="checklistItems" style="margin-top:8px;"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="copySummary()">📋 Copy Summary to Clipboard</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GUIDE -->
+  <div class="panel" id="panel-guide">
+    <div class="card">
+      <h3 style="margin-top:0;">The workflow</h3>
+      <div class="guide-step"><div class="guide-num">1</div><div><strong>Log same day.</strong> Tap "Log Today", tap "Use My Location" to auto-detect the nearest facility, confirm, add notes if useful. Takes about 10 seconds.</div></div>
+      <div class="guide-step"><div class="guide-num">2</div><div><strong>Forgot a day?</strong> Use the date picker under Quick Log to backfill — don't let more than a few days pile up.</div></div>
+      <div class="guide-step"><div class="guide-num">3</div><div><strong>Snap receipts immediately.</strong> Log them in the Receipts tab the same day you get them — tap the photo field to snap it with your camera, description + amount is enough, mark "Ready" once it's actually ready to upload.</div></div>
+      <div class="guide-step"><div class="guide-num">4</div><div><strong>AT&T bill.</strong> Log it on the 1st of each month (cap: $100).</div></div>
+      <div class="guide-step"><div class="guide-num">5</div><div><strong>Month-end:</strong> Run the checklist, then hit "Copy Summary" and paste it into Concur or your notes while you enter everything.</div></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Away-affiliate days</h3>
+      <p style="font-size:14px;">Your six regular locations (SRQ, NOR, CHE, FRE, BAL, DR) are always available as tap chips. When you're on the road somewhere else, tap <strong>"+ Other"</strong>, type the city/opponent, and it's saved so it shows up as a quick chip next time you're there.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Keeping data in sync</h3>
+      <p style="font-size:14px;">Tap <strong>"Connect Google Drive"</strong> on any device — phone or desktop — and sign in once. Every entry then saves straight to a <code>fielddiary-data.json</code> file in your Drive, and pulls in whatever the other device has saved too (newer entries win automatically if a day exists in both). Your phone's sign-in only lasts about an hour at a time, so if the status pill says "Reconnect needed," just tap the button again — it's a one-tap re-auth, not a full reset. <strong>Receipt photos stay local to whichever device took them</strong> and aren't synced through Drive, so snap and upload to Concur from the same device.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Entry editor modal -->
+<div class="overlay" id="entryOverlay">
+  <div class="modal">
+    <h3>Log Entry</h3>
+    <div class="sub mono" id="entryDateLabel" style="color:var(--muted);font-size:13px;"></div>
+    <label class="field-label">Date</label>
+    <input type="date" id="entryDate" onchange="onEntryDateChange()">
+
+    <label class="field-label">Location(s)</label>
+    <div class="loc-picker" id="locPicker"></div>
+    <button class="btn ghost" style="margin-bottom:4px;" onclick="useMyLocation()">📍 Use My Location</button>
+    <div class="geo-status" id="geoStatus"></div>
+
+    <label class="field-label">Tags</label>
+    <div class="tag-picker" id="tagPicker"></div>
+
+    <label class="field-label">Notes</label>
+    <textarea id="entryNotes" placeholder="Optional — e.g. flight times, mileage note, anything useful for Concur"></textarea>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="saveEntry()">Save</button>
+      <button class="btn ghost" onclick="clearEntry()">Clear Day</button>
+      <button class="btn secondary" onclick="closeEditor()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo viewer modal -->
+<div class="overlay" id="photoOverlay" onclick="if(event.target===this) closePhotoViewer()">
+  <div class="modal" style="max-width:520px;text-align:center;">
+    <img id="photoViewerImg" style="max-width:100%;border-radius:10px;">
+    <div class="modal-actions" style="justify-content:center;">
+      <button class="btn ghost" onclick="closePhotoViewer()">Close</button>
+    </div>
+  </div>
+</div>
+
+<footer class="note">FieldDiary · data stored locally on this device, syncs to your Google Drive when connected.</footer>
+
+<script>
+/* ---------------- Data model ---------------- */
+const LOCATIONS = [
+  {code:'SRQ', name:'Sarasota, FL — Spring Training Complex', lat:27.334, lon:-82.511},
+  {code:'NOR', name:'Norfolk, VA — Triple-A', lat:36.8459, lon:-76.2879},
+  {code:'CHE', name:'Bowie, MD — Double-A', lat:38.9896, lon:-76.7355},
+  {code:'FRE', name:'Frederick, MD — High-A', lat:39.3919, lon:-77.4105},
+  {code:'BAL', name:'Baltimore, MD — Camden Yards', lat:39.2842, lon:-76.6224},
+  {code:'DR',  name:'Dominican Republic Complex', lat:18.4539, lon:-69.6034},
+  {code:'HOME', name:'Home / WFH', lat:null, lon:null}
+];
+const TAGS = ['Hotel','WFH','Receipt','Phone'];
+const CHECKLIST_STEPS = [
+  'Review calendar for any days you forgot to log',
+  'Enter all mileage (From → To, with purpose) in Concur',
+  'Upload all hotel folios in Concur',
+  'Upload all work receipts in Concur',
+  'Upload AT&T phone bill (cap: $100)',
+  'Review all entries for accuracy before submitting',
+  'Submit expense report in Concur 🎉'
+];
+
+/* Fill in with your own OAuth Client ID from Google Cloud Console (see setup guide). */
+const GOOGLE_CLIENT_ID = 'REPLACE_WITH_YOUR_CLIENT_ID.apps.googleusercontent.com';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_FILENAME = 'fielddiary-data.json';
+
+let dayData = {};        // "YYYY-MM-DD" -> {locations:[codes/custom strings], tags:[...], notes:"", updatedAt}
+let receipts = [];       // {id, date, type, description, amount, status, hasPhoto, updatedAt}
+let checklistState = {}; // "YYYY-MM" -> {0:bool,...}
+let customLocations = []; // array of strings
+let saveTimer = null;
+
+let tokenClient = null;
+let accessToken = null;
+let accessTokenExpiry = 0;
+let driveFileId = null;
+
+const today = new Date();
+let viewYear = today.getFullYear();
+let viewMonth = today.getMonth(); // 0-based
+
+let editingDate = null;
+let editingLocations = [];
+let editingTags = [];
+let receiptThumbUrls = [];
+
+/* ---------------- Helpers ---------------- */
+function pad(n){ return String(n).padStart(2,'0'); }
+function dayKey(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
+function todayKey(){ return dayKey(today.getFullYear(), today.getMonth(), today.getDate()); }
+function monthKey(y,m){ return `${y}-${pad(m+1)}`; }
+function fmtMonth(y,m){ return new Date(y,m,1).toLocaleString('en-US',{month:'long',year:'numeric'}); }
+function haversine(lat1,lon1,lat2,lon2){
+  const R=3958.8, toRad=x=>x*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function allLocationChips(){
+  return LOCATIONS.map(l=>l.code).concat(customLocations);
+}
+function locationLabel(codeOrName){
+  const known = LOCATIONS.find(l=>l.code===codeOrName);
+  return known ? known.code : codeOrName;
+}
+
+/* ---------------- IndexedDB (kv store + receipt photo blobs) ---------------- */
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const req = indexedDB.open('fielddiary-db',2);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+      if(!db.objectStoreNames.contains('photos')) db.createObjectStore('photos');
+    };
+    req.onsuccess = ()=> res(req.result);
+    req.onerror = ()=> rej(req.error);
+  });
+}
+async function idbSet(key,val){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction('kv','readwrite');
+    tx.objectStore('kv').put(val,key);
+    tx.oncomplete = ()=>res();
+    tx.onerror = ()=>rej(tx.error);
+  });
+}
+async function idbGet(key){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction('kv','readonly');
+    const r = tx.objectStore('kv').get(key);
+    r.onsuccess = ()=>res(r.result);
+    r.onerror = ()=>rej(r.error);
+  });
+}
+async function idbPhotoSet(id, blob){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction('photos','readwrite');
+    tx.objectStore('photos').put(blob,id);
+    tx.oncomplete = ()=>res();
+    tx.onerror = ()=>rej(tx.error);
+  });
+}
+async function idbPhotoGet(id){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction('photos','readonly');
+    const r = tx.objectStore('photos').get(id);
+    r.onsuccess = ()=>res(r.result);
+    r.onerror = ()=>rej(r.error);
+  });
+}
+async function idbPhotoDelete(id){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{
+    const tx = db.transaction('photos','readwrite');
+    tx.objectStore('photos').delete(id);
+    tx.oncomplete = ()=>res();
+    tx.onerror = ()=>rej(tx.error);
+  });
+}
+
+/* ---------------- Load / Save ---------------- */
+function serializeState(){
+  return JSON.stringify({dayData, receipts, checklistState, customLocations}, null, 2);
+}
+function applyState(obj){
+  dayData = obj.dayData || {};
+  receipts = obj.receipts || [];
+  checklistState = obj.checklistState || {};
+  customLocations = obj.customLocations || [];
+}
+function mergeState(incoming){
+  let added=0, updated=0, newReceipts=0;
+  for(const [k,v] of Object.entries(incoming.dayData || {})){
+    const cur = dayData[k];
+    if(!cur){ dayData[k]=v; added++; }
+    else if((v.updatedAt||0) > (cur.updatedAt||0)){ dayData[k]=v; updated++; }
+  }
+  const existingIdx = new Map(receipts.map((r,i)=>[r.id,i]));
+  for(const r of (incoming.receipts||[])){
+    if(!existingIdx.has(r.id)){ receipts.push(r); newReceipts++; }
+    else{
+      const i = existingIdx.get(r.id);
+      if((r.updatedAt||0) > (receipts[i].updatedAt||0)){ receipts[i] = r; updated++; }
+    }
+  }
+  for(const loc of (incoming.customLocations||[])){
+    if(!customLocations.includes(loc)) customLocations.push(loc);
+  }
+  for(const [mk, state] of Object.entries(incoming.checklistState || {})){
+    if(!checklistState[mk]) checklistState[mk] = {};
+    for(const [i,val] of Object.entries(state)){
+      if(val) checklistState[mk][i] = true;
+    }
+  }
+  return {added, updated, newReceipts};
+}
+function loadFromLocalStorage(){
+  try{
+    const raw = localStorage.getItem('fielddiary-data');
+    if(raw) applyState(JSON.parse(raw));
+  }catch(e){ console.warn('local load failed', e); }
+}
+function saveToLocalStorage(){
+  localStorage.setItem('fielddiary-data', serializeState());
+}
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(persist, 300);
+}
+async function persist(){
+  saveToLocalStorage();
+  if(!driveFileId){ driveFileId = await idbGet('driveFileId'); }
+  if(driveFileId && accessToken && Date.now() < accessTokenExpiry){
+    try{
+      await driveUploadContent(driveFileId, serializeState());
+      setSyncStatus(true, 'Saved ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}));
+      return;
+    }catch(e){ console.warn('drive save failed', e); }
+  }
+  setSyncStatus(false, driveFileId ? 'Reconnect needed' : 'Local only');
+}
+function setSyncStatus(on, text){
+  document.getElementById('syncDot').classList.toggle('on', on);
+  document.getElementById('syncText').textContent = text;
+}
+
+async function initStorage(){
+  loadFromLocalStorage();
+  driveFileId = await idbGet('driveFileId');
+  setSyncStatus(false, driveFileId ? 'Tap Connect Google Drive to resume sync' : 'Local only — not connected');
+}
+
+/* ---------------- Google Drive sync ---------------- */
+function getTokenClient(){
+  if(typeof google === 'undefined' || !google.accounts){
+    throw new Error('Google sign-in script not loaded yet');
+  }
+  if(!tokenClient){
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: onDriveAuthResult
+    });
+  }
+  return tokenClient;
+}
+function connectDrive(){
+  try{
+    getTokenClient().requestAccessToken({prompt: accessToken ? '' : 'consent'});
+  }catch(e){
+    alert('Google sign-in isn\'t ready yet — check your connection and try again in a moment.');
+  }
+}
+async function onDriveAuthResult(resp){
+  if(resp.error){ setSyncStatus(false, 'Drive connection failed'); return; }
+  accessToken = resp.access_token;
+  accessTokenExpiry = Date.now() + (resp.expires_in*1000 - 60000);
+  try{
+    if(!driveFileId) driveFileId = await idbGet('driveFileId');
+    if(!driveFileId){
+      driveFileId = await driveCreateFile();
+      await idbSet('driveFileId', driveFileId);
+    }
+    await pullFromDrive();
+    await pushToDrive();
+    setSyncStatus(true, 'Drive connected');
+  }catch(e){
+    console.warn('drive connect failed', e);
+    setSyncStatus(false, 'Drive connection failed');
+  }
+}
+async function driveCreateFile(){
+  const metaResp = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method:'POST',
+    headers:{'Authorization':'Bearer '+accessToken, 'Content-Type':'application/json'},
+    body: JSON.stringify({name: DRIVE_FILENAME, mimeType:'application/json'})
+  });
+  if(!metaResp.ok) throw new Error('create failed: '+metaResp.status);
+  const meta = await metaResp.json();
+  await driveUploadContent(meta.id, serializeState());
+  return meta.id;
+}
+async function driveDownloadContent(fileId){
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers:{'Authorization':'Bearer '+accessToken}
+  });
+  if(!resp.ok) throw new Error('download failed: '+resp.status);
+  return resp.text();
+}
+async function driveUploadContent(fileId, content){
+  const resp = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+    method:'PATCH',
+    headers:{'Authorization':'Bearer '+accessToken, 'Content-Type':'application/json'},
+    body: content
+  });
+  if(!resp.ok) throw new Error('upload failed: '+resp.status);
+}
+async function pullFromDrive(){
+  if(!driveFileId) return;
+  const text = await driveDownloadContent(driveFileId);
+  if(text && text.trim()){
+    mergeState(JSON.parse(text));
+    saveToLocalStorage();
+    renderAll();
+  }
+}
+async function pushToDrive(){
+  if(!driveFileId || !accessToken || Date.now() >= accessTokenExpiry) return false;
+  await driveUploadContent(driveFileId, serializeState());
+  return true;
+}
+
+function exportData(){
+  const blob = new Blob([serializeState()], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'fielddiary-export-' + todayKey() + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importData(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const incoming = JSON.parse(reader.result);
+      const {added, updated, newReceipts} = mergeState(incoming);
+      scheduleSave();
+      renderAll();
+      alert(`Import complete: ${added} new day(s), ${updated} updated, ${newReceipts} new receipt(s).`);
+    }catch(e){
+      alert('Could not read that file — is it a FieldDiary export?');
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+
+/* ---------------- Tabs ---------------- */
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active', p.id==='panel-'+name));
+  if(name==='receipts') renderReceipts();
+  if(name==='checklist') renderChecklist();
+}
+
+/* ---------------- Calendar ---------------- */
+function changeMonth(delta){
+  viewMonth += delta;
+  if(viewMonth<0){ viewMonth=11; viewYear--; }
+  if(viewMonth>11){ viewMonth=0; viewYear++; }
+  renderCalendar();
+}
+function renderDow(){
+  const row = document.getElementById('dowRow');
+  row.innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="dow">${d}</div>`).join('');
+}
+function renderCalendar(){
+  document.getElementById('monthLabel').textContent = fmtMonth(viewYear, viewMonth);
+  const grid = document.getElementById('calGrid');
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+  let html='';
+  for(let i=0;i<firstDow;i++) html += `<div class="day empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const key = dayKey(viewYear, viewMonth, d);
+    const entry = dayData[key];
+    const isToday = key === todayKey();
+    let chips='';
+    let tooltip='';
+    if(entry){
+      (entry.locations||[]).forEach(l=>{ chips += `<span class="chip loc">${locationLabel(l)}</span>`; });
+      if((entry.tags||[]).includes('Hotel')) chips += `<span class="chip hotel">🏨</span>`;
+      if((entry.tags||[]).includes('WFH')) chips += `<span class="chip wfh">🏠</span>`;
+      if((entry.tags||[]).includes('Receipt')) chips += `<span class="chip receipt">🧾</span>`;
+      if((entry.tags||[]).includes('Phone')) chips += `<span class="chip phone">📱</span>`;
+      const lines = [];
+      if((entry.locations||[]).length) lines.push((entry.locations||[]).map(locationLabel).join(', '));
+      if(entry.notes) lines.push(...entry.notes.split('|').map(s=>s.trim()).filter(Boolean));
+      tooltip = `<div class="tooltip">${lines.map(l=>`<div>${l}</div>`).join('')}</div>`;
+    }
+    html += `<div class="day${isToday?' today':''}" onclick="openEditorFor('${key}')">
+      <div class="num">${d}</div>
+      <div class="chips">${chips}</div>
+      ${tooltip}
+    </div>`;
+  }
+  grid.innerHTML = html;
+  renderStats();
+}
+function renderStats(){
+  let days=0, hotel=0, rec=0, phone=false;
+  const prefix = `${viewYear}-${pad(viewMonth+1)}-`;
+  Object.entries(dayData).forEach(([k,v])=>{
+    if(!k.startsWith(prefix)) return;
+    if((v.locations||[]).length) days++;
+    if((v.tags||[]).includes('Hotel')) hotel++;
+  });
+  receipts.forEach(r=>{
+    if(r.date && r.date.startsWith(prefix)){
+      rec++;
+      if(r.type === 'AT&T Phone Bill') phone = true;
+    }
+  });
+  document.getElementById('statDays').textContent = days;
+  document.getElementById('statHotel').textContent = hotel;
+  document.getElementById('statReceipts').textContent = rec;
+  document.getElementById('statPhone').textContent = phone ? '✓' : '—';
+}
+
+/* ---------------- Entry editor ---------------- */
+function openEditorFor(dateStr){
+  if(!dateStr) return;
+  editingDate = dateStr;
+  const entry = dayData[dateStr] || {locations:[], tags:[], notes:''};
+  editingLocations = [...(entry.locations||[])];
+  editingTags = [...(entry.tags||[])];
+  document.getElementById('entryDate').value = dateStr;
+  document.getElementById('entryDateLabel').textContent = new Date(dateStr+'T12:00:00').toDateString();
+  document.getElementById('entryNotes').value = entry.notes || '';
+  document.getElementById('geoStatus').textContent = '';
+  renderLocPicker();
+  renderTagPicker();
+  document.getElementById('entryOverlay').classList.add('active');
+}
+function onEntryDateChange(){
+  const newDate = document.getElementById('entryDate').value;
+  if(newDate) openEditorFor(newDate);
+}
+function closeEditor(){
+  document.getElementById('entryOverlay').classList.remove('active');
+}
+function renderLocPicker(){
+  const el = document.getElementById('locPicker');
+  const chips = allLocationChips();
+  el.innerHTML = chips.map(code=>{
+    const known = LOCATIONS.find(l=>l.code===code);
+    const label = known ? known.code : code;
+    const sel = editingLocations.includes(code) ? ' selected' : '';
+    return `<button type="button" class="loc-btn${sel}" onclick="toggleLoc('${code.replace(/'/g,"\\'")}')">${label}</button>`;
+  }).join('') + `<button type="button" class="loc-btn add" onclick="addCustomLocation()">+ Other</button>`;
+}
+function toggleLoc(code){
+  const i = editingLocations.indexOf(code);
+  if(i>-1) editingLocations.splice(i,1); else editingLocations.push(code);
+  renderLocPicker();
+}
+function addCustomLocation(){
+  const name = prompt('Location name (e.g. city/opponent for an away day):');
+  if(!name) return;
+  const trimmed = name.trim();
+  if(!trimmed) return;
+  if(!customLocations.includes(trimmed)) customLocations.push(trimmed);
+  editingLocations.push(trimmed);
+  renderLocPicker();
+  scheduleSave();
+}
+function renderTagPicker(){
+  const el = document.getElementById('tagPicker');
+  el.innerHTML = TAGS.map(t=>{
+    const sel = editingTags.includes(t) ? ' selected' : '';
+    return `<button type="button" class="tag-btn${sel}" onclick="toggleTag('${t}')">${t}</button>`;
+  }).join('');
+}
+function toggleTag(t){
+  const i = editingTags.indexOf(t);
+  if(i>-1) editingTags.splice(i,1); else editingTags.push(t);
+  renderTagPicker();
+}
+function saveEntry(){
+  const notes = document.getElementById('entryNotes').value;
+  dayData[editingDate] = {
+    locations: editingLocations,
+    tags: editingTags,
+    notes: notes,
+    updatedAt: Date.now()
+  };
+  scheduleSave();
+  closeEditor();
+  renderCalendar();
+}
+function clearEntry(){
+  delete dayData[editingDate];
+  scheduleSave();
+  closeEditor();
+  renderCalendar();
+}
+async function useMyLocation(){
+  const statusEl = document.getElementById('geoStatus');
+  if(!navigator.geolocation){ statusEl.textContent = 'Geolocation not supported on this device.'; return; }
+  statusEl.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude, longitude} = pos.coords;
+    let best=null, bestDist=Infinity;
+    LOCATIONS.forEach(l=>{
+      if(l.lat==null) return;
+      const dist = haversine(latitude, longitude, l.lat, l.lon);
+      if(dist < bestDist){ bestDist = dist; best = l; }
+    });
+    if(best && bestDist < 25){
+      if(!editingLocations.includes(best.code)) editingLocations.push(best.code);
+      renderLocPicker();
+      statusEl.textContent = `Detected ${best.code} (~${bestDist.toFixed(1)} mi away) — added.`;
+    } else {
+      statusEl.textContent = `You're ~${bestDist.toFixed(0)} mi from the nearest saved location (${best?best.code:'n/a'}). Tap "+ Other" to log this spot.`;
+    }
+  }, err=>{
+    statusEl.textContent = 'Could not get location (permission denied or unavailable).';
+  }, {enableHighAccuracy:true, timeout:8000});
+}
+
+/* ---------------- Receipts ---------------- */
+function toggleReceiptForm(){
+  const f = document.getElementById('receiptForm');
+  f.style.display = f.style.display==='none' ? 'block' : 'none';
+  document.getElementById('rDate').value = todayKey();
+  document.getElementById('rPhoto').value = '';
+  const preview = document.getElementById('rPhotoPreview');
+  preview.style.display = 'none';
+  preview.src = '';
+}
+function onReceiptPhotoChange(){
+  const file = document.getElementById('rPhoto').files[0];
+  const preview = document.getElementById('rPhotoPreview');
+  if(!file){ preview.style.display='none'; preview.src=''; return; }
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+}
+async function saveReceipt(){
+  const date = document.getElementById('rDate').value || todayKey();
+  const type = document.getElementById('rType').value;
+  const desc = document.getElementById('rDesc').value || type;
+  const amount = parseFloat(document.getElementById('rAmount').value) || 0;
+  const photoFile = document.getElementById('rPhoto').files[0];
+  const id = 'r'+Date.now();
+  receipts.push({id, date, type, description: desc, amount, status:'Pending', hasPhoto: !!photoFile, updatedAt: Date.now()});
+  if(photoFile){ await idbPhotoSet(id, photoFile); }
+  scheduleSave();
+  toggleReceiptForm();
+  document.getElementById('rDesc').value=''; document.getElementById('rAmount').value='';
+  renderReceipts();
+  renderStats();
+}
+async function deleteReceipt(id){
+  const r = receipts.find(r=>r.id===id);
+  receipts = receipts.filter(r=>r.id!==id);
+  if(r && r.hasPhoto){ await idbPhotoDelete(id); }
+  scheduleSave();
+  renderReceipts();
+  renderStats();
+}
+function toggleReceiptStatus(id){
+  const r = receipts.find(r=>r.id===id);
+  if(r){ r.status = r.status==='Ready to upload' ? 'Pending' : 'Ready to upload'; r.updatedAt = Date.now(); }
+  scheduleSave();
+  renderReceipts();
+}
+function iconFor(type){
+  return {'Work Receipt':'🧾','Hotel Stay':'🏨','AT&T Phone Bill':'📱','Other':'📎'}[type] || '📎';
+}
+function revokeReceiptThumbs(){
+  receiptThumbUrls.forEach(u=>URL.revokeObjectURL(u));
+  receiptThumbUrls = [];
+}
+function renderReceipts(){
+  revokeReceiptThumbs();
+  document.getElementById('receiptsMonthLabel').textContent = fmtMonth(viewYear, viewMonth);
+  const prefix = `${viewYear}-${pad(viewMonth+1)}-`;
+  const list = receipts.filter(r=>r.date && r.date.startsWith(prefix)).sort((a,b)=>a.date.localeCompare(b.date));
+  const el = document.getElementById('receiptsList');
+  if(!list.length){ el.innerHTML = '<div class="empty-state">No receipts logged for this month yet.</div>'; return; }
+  el.innerHTML = list.map(r=>`
+    <div class="receipt-row">
+      <div class="receipt-icon${r.hasPhoto?' photo-thumb':''}" data-id="${r.id}" ${r.hasPhoto?`onclick="openPhotoViewer('${r.id}')"`:''}>${r.hasPhoto?'':iconFor(r.type)}</div>
+      <div class="receipt-info">
+        <div class="name">${r.description}</div>
+        <div class="meta">${r.date} · ${r.type}</div>
+      </div>
+      <div class="receipt-amt">$${r.amount.toFixed(2)}</div>
+      <div class="status-badge ${r.status==='Ready to upload'?'ready':'pending'}" onclick="toggleReceiptStatus('${r.id}')">${r.status==='Ready to upload'?'Ready':'Pending'}</div>
+      <button class="del-btn" onclick="deleteReceipt('${r.id}')">×</button>
+    </div>
+  `).join('');
+  list.filter(r=>r.hasPhoto).forEach(async r=>{
+    const blob = await idbPhotoGet(r.id);
+    if(!blob) return;
+    const url = URL.createObjectURL(blob);
+    receiptThumbUrls.push(url);
+    const thumb = el.querySelector(`.receipt-icon[data-id="${r.id}"]`);
+    if(thumb) thumb.style.backgroundImage = `url(${url})`;
+  });
+}
+async function openPhotoViewer(id){
+  const blob = await idbPhotoGet(id);
+  if(!blob) return;
+  const url = URL.createObjectURL(blob);
+  document.getElementById('photoViewerImg').src = url;
+  document.getElementById('photoOverlay').classList.add('active');
+}
+function closePhotoViewer(){
+  document.getElementById('photoOverlay').classList.remove('active');
+  document.getElementById('photoViewerImg').src = '';
+}
+
+/* ---------------- Checklist ---------------- */
+function renderChecklist(){
+  const mk = monthKey(viewYear, viewMonth);
+  document.getElementById('checklistMonthLabel').textContent = fmtMonth(viewYear, viewMonth);
+  const state = checklistState[mk] || {};
+  const el = document.getElementById('checklistItems');
+  el.innerHTML = CHECKLIST_STEPS.map((step,i)=>`
+    <div class="check-item ${state[i]?'done':''}" onclick="toggleCheck(${i})">
+      <div class="box">${state[i]?'✓':''}</div>
+      <div class="txt">${step}</div>
+    </div>
+  `).join('');
+}
+function toggleCheck(i){
+  const mk = monthKey(viewYear, viewMonth);
+  if(!checklistState[mk]) checklistState[mk] = {};
+  checklistState[mk][i] = !checklistState[mk][i];
+  scheduleSave();
+  renderChecklist();
+}
+function resetChecklist(){
+  const mk = monthKey(viewYear, viewMonth);
+  checklistState[mk] = {};
+  scheduleSave();
+  renderChecklist();
+}
+function copySummary(){
+  const prefix = `${viewYear}-${pad(viewMonth+1)}-`;
+  const days = Object.entries(dayData).filter(([k])=>k.startsWith(prefix)).sort(([a],[b])=>a.localeCompare(b));
+  let text = `FieldDiary Summary — ${fmtMonth(viewYear, viewMonth)}\n\n`;
+  text += `LOCATION DAYS:\n`;
+  days.forEach(([k,v])=>{
+    const locs = (v.locations||[]).map(locationLabel).join(', ') || '(no location)';
+    const tags = (v.tags||[]).join(', ');
+    text += `${k}: ${locs}${tags?' ['+tags+']':''}${v.notes?' — '+v.notes:''}\n`;
+  });
+  const recs = receipts.filter(r=>r.date && r.date.startsWith(prefix)).sort((a,b)=>a.date.localeCompare(b.date));
+  text += `\nRECEIPTS:\n`;
+  let total=0;
+  recs.forEach(r=>{ text += `${r.date}: ${r.type} — ${r.description} — $${r.amount.toFixed(2)} [${r.status}]\n`; total += r.amount; });
+  text += `\nTotal receipts: $${total.toFixed(2)}\n`;
+  navigator.clipboard.writeText(text).then(()=>{
+    alert('Summary copied to clipboard.');
+  }).catch(()=>{
+    prompt('Copy manually:', text);
+  });
+}
+
+/* ---------------- Init ---------------- */
+function renderAll(){
+  renderDow();
+  renderCalendar();
+  renderReceipts();
+  renderChecklist();
+}
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW registration failed', e));
+  });
+}
+(async function init(){
+  document.getElementById('backdateInput').value = todayKey();
+  await initStorage();
+  renderAll();
+})();
+</script>
+</body>
+</html>
