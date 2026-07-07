@@ -543,18 +543,50 @@ async function onDriveAuthResult(resp){
   accessToken = resp.access_token;
   accessTokenExpiry = Date.now() + (resp.expires_in*1000 - 60000);
   try{
-    if(!driveFileId) driveFileId = await idbGet('driveFileId');
-    if(!driveFileId){
-      driveFileId = await driveCreateFile();
-      await idbSet('driveFileId', driveFileId);
-    }
-    await pullFromDrive();
+    const canonical = await driveReconcile();
+    driveFileId = canonical || await driveCreateFile();
+    await idbSet('driveFileId', driveFileId);
+    saveToLocalStorage();
+    renderAll();
     await pushToDrive();
     setSyncStatus(true, 'Drive connected');
   }catch(e){
     console.warn('drive connect failed', e);
     setSyncStatus(false, 'Drive connection failed');
   }
+}
+async function driveFindAllFiles(){
+  const q = encodeURIComponent(`name='${DRIVE_FILENAME}' and trashed=false`);
+  const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,createdTime)&orderBy=createdTime`, {
+    headers:{'Authorization':'Bearer '+accessToken}
+  });
+  if(!resp.ok) throw new Error('search failed: '+resp.status);
+  const data = await resp.json();
+  return data.files || [];
+}
+async function driveReconcile(){
+  // Different devices may each have created their own fielddiary-data.json before ever
+  // seeing each other's file (drive.file scope only reveals files this app already knows
+  // about locally). Find every matching file, merge all of them together, keep the oldest
+  // as the one true file going forward, and delete the rest so this can't keep happening.
+  const files = await driveFindAllFiles();
+  if(!files.length) return null;
+  for(const f of files){
+    try{
+      const text = await driveDownloadContent(f.id);
+      if(text && text.trim()) mergeState(JSON.parse(text));
+    }catch(e){ console.warn('reconcile download failed for', f.id, e); }
+  }
+  const canonical = files[0].id;
+  for(const f of files.slice(1)){
+    try{
+      await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
+        method:'DELETE',
+        headers:{'Authorization':'Bearer '+accessToken}
+      });
+    }catch(e){ console.warn('reconcile delete failed for', f.id, e); }
+  }
+  return canonical;
 }
 async function driveCreateFile(){
   const metaResp = await fetch('https://www.googleapis.com/drive/v3/files', {
@@ -581,15 +613,6 @@ async function driveUploadContent(fileId, content){
     body: content
   });
   if(!resp.ok) throw new Error('upload failed: '+resp.status);
-}
-async function pullFromDrive(){
-  if(!driveFileId) return;
-  const text = await driveDownloadContent(driveFileId);
-  if(text && text.trim()){
-    mergeState(JSON.parse(text));
-    saveToLocalStorage();
-    renderAll();
-  }
 }
 async function pushToDrive(){
   if(!driveFileId || !accessToken || Date.now() >= accessTokenExpiry) return false;
